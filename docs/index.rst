@@ -14,3 +14,4 @@ A cryptography interface for signing and verifying digital signatures.
    :caption: Contents
 
    signer
+   policy

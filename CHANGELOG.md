@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+* Group-threshold signature policy for DSSE envelopes: new
+  `securesystemslib.policy` module with `ThresholdPolicy`, `ThresholdGroup`
+  and `Envelope.verify_policy()`. Independent per-group subject thresholds
+  (e.g. one builder and one auditor) are verified from trusted configuration
+  only; ambiguous key assignments are rejected and subjects with multiple
+  keys are counted once. The existing `Envelope.verify()` behavior is
+  unchanged.
+
 ## 1.6.0
 
 ### Changed

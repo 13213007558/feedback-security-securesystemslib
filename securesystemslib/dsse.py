@@ -7,6 +7,11 @@ from typing import Any
 
 from securesystemslib import exceptions
 from securesystemslib._internal.utils import b64dec, b64enc, make_hashable
+from securesystemslib.policy import (
+    PolicyVerificationResult,
+    ThresholdPolicy,
+    verify_policy,
+)
 from securesystemslib.signer import Key, Signature, Signer
 
 logger = logging.getLogger(__name__)
@@ -178,3 +183,29 @@ class Envelope:
             )
 
         return accepted_keys
+
+    def verify_policy(self, policy: ThresholdPolicy) -> PolicyVerificationResult:
+        """Verify the envelope against a group-threshold signature policy.
+
+        Unlike :meth:`verify`, which applies one threshold across all keys,
+        each policy group has its own minimum number of distinct verified
+        subjects (e.g. one builder and one auditor). Group membership is taken
+        exclusively from the trusted ``policy``; roles or key ids claimed in
+        the envelope are not trusted.
+
+        Arguments:
+            policy: A trusted ``ThresholdPolicy`` describing public keys,
+                subjects and per-group thresholds.
+
+        Raises:
+            PolicyVerificationError: If any group threshold is not met. The
+                error names the unsatisfied groups without exposing payload
+                contents or private key material.
+
+        Returns:
+            A ``PolicyVerificationResult`` with the verified subjects and the
+            per-group satisfaction details. Only signatures that authenticate
+            the PAE of the original payload type and payload are counted.
+        """
+
+        return verify_policy(self.pae(), self.signatures.values(), policy)
