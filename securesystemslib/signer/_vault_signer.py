@@ -7,6 +7,7 @@ from urllib import parse
 
 from securesystemslib.exceptions import UnsupportedLibraryError
 from securesystemslib.signer._key import Key, SSlibKey
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signer import SecretsHandler, Signature, Signer
 
 VAULT_IMPORT_ERROR = None
@@ -80,6 +81,7 @@ class VaultSigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> VaultSigner:
         if not isinstance(public_key, SSlibKey):
             raise ValueError(f"Expected SSlibKey for {priv_key_uri}")

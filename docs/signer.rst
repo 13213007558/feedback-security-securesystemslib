@@ -116,6 +116,45 @@ The following example illustrates the full lifecycle using :class:`HSMSigner`
    See `'New Signer API' <https://theupdateframework.github.io/python-tuf/2023/01/24/securesystemslib-signer-api.html>`_ blog post
    for background information.
 
+Isolated registration
+---------------------
+
+Registering custom implementations in the global ``SIGNER_FOR_URI_SCHEME`` and
+``KEY_FOR_TYPE_AND_SCHEME`` tables affects the whole process. If multiple
+applications (or tenants) share one process and register conflicting
+implementations -- for example the same private key URI scheme -- use a
+:class:`SignerRegistry` per application instead. Each registry snapshots the
+built-in defaults at construction, and local registrations stay private to it.
+
+.. code-block:: python
+
+    from securesystemslib.signer import (
+        KEY_FOR_TYPE_AND_SCHEME,
+        SIGNER_FOR_URI_SCHEME,
+        Key,
+        Signer,
+        SignerRegistry,
+    )
+
+    # Before: process-wide global registration
+    SIGNER_FOR_URI_SCHEME[MySigner.SCHEME] = MySigner
+    KEY_FOR_TYPE_AND_SCHEME[(MyKey.KEYTYPE, MyKey.SCHEME)] = MyKey
+    signer = Signer.from_priv_key_uri(uri, public_key)
+    key = Key.from_dict(keyid, key_dict)
+
+    # After: registration isolated to one registry instance
+    registry = SignerRegistry()
+    registry.register_signer(MySigner.SCHEME, MySigner)
+    registry.register_key(MyKey.KEYTYPE, MyKey.SCHEME, MyKey)
+    signer = registry.signer_from_priv_key_uri(uri, public_key)
+    key = registry.key_from_dict(keyid, key_dict)
+
+Registering an already registered name raises ``ValueError``; pass
+``replace=True`` to explicitly override. The registry is propagated through
+nested dispatch: signer or key implementations that internally call
+``Signer.from_priv_key_uri()`` or ``Key.from_dict()`` resolve against the
+registry they were constructed with.
+
 API documentation
 -----------------
 
@@ -128,6 +167,8 @@ API documentation
 .. autoclass:: securesystemslib.signer.Signer
 .. autoclass:: securesystemslib.signer.Key
 .. autoclass:: securesystemslib.signer.Signature
+.. autoclass:: securesystemslib.signer.SignerRegistry
+   :members: register_signer, register_key, signer_from_priv_key_uri, key_from_dict
 
 Key type constants
 ~~~~~~~~~~~~~~~~~~

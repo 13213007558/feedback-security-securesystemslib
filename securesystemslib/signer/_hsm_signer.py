@@ -15,6 +15,7 @@ from urllib import parse
 from securesystemslib.exceptions import UnsupportedLibraryError
 from securesystemslib.signer._constants import ECDSA_SHA2_NISTP256, ECDSA_SHA2_NISTP384
 from securesystemslib.signer._key import Key, SSlibKey
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import SecretsHandler, Signer
 
@@ -232,6 +233,7 @@ class HSMSigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> HSMSigner:
         if not isinstance(public_key, SSlibKey):
             raise ValueError(f"expected SSlibKey for {priv_key_uri}")

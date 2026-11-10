@@ -8,6 +8,7 @@ from urllib import parse
 from securesystemslib.exceptions import KeyMismatchError, UnsupportedLibraryError
 from securesystemslib.signer._constants import MLDSA_44_1
 from securesystemslib.signer._key import Key, SSlibKey
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import SecretsHandler, Signer
 from securesystemslib.signer._utils import get_mldsa_payload
@@ -84,6 +85,7 @@ class TKeySigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> TKeySigner:
         if not isinstance(public_key, SSlibKey):
             raise ValueError(f"expected SSlibKey for {priv_key_uri}")

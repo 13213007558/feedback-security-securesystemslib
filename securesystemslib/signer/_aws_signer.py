@@ -23,6 +23,7 @@ from securesystemslib.signer._constants import (
     RSASSA_PSS_SHA512,
 )
 from securesystemslib.signer._key import Key, SSlibKey
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signer import SecretsHandler, Signature, Signer
 from securesystemslib.signer._utils import compute_default_keyid
 
@@ -98,6 +99,7 @@ class AWSSigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> AWSSigner:
         if not isinstance(public_key, SSlibKey):
             raise ValueError(f"Expected SSlibKey for {priv_key_uri}")

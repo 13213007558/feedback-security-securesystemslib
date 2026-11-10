@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import warnings
 from abc import ABCMeta, abstractmethod
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from securesystemslib._internal.utils import make_hashable
 from securesystemslib._vendor.ed25519.ed25519 import (
@@ -17,6 +17,10 @@ from securesystemslib.exceptions import (
     UnverifiedSignatureError,
     VerificationError,
 )
+from securesystemslib.signer._registry import CURRENT_REGISTRY
+
+if TYPE_CHECKING:
+    from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._constants import (
     ECDSA_SHA2_NISTP256,
     ECDSA_SHA2_NISTP384,
@@ -177,7 +181,12 @@ class Key(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, keyid: str, key_dict: dict[str, Any]) -> Key:
+    def from_dict(
+        cls,
+        keyid: str,
+        key_dict: dict[str, Any],
+        registry: SignerRegistry | None = None,
+    ) -> Key:
         """Creates ``Key`` object from a serialization dict
 
         Key implementations must override this factory constructor that is used
@@ -187,18 +196,45 @@ class Key(metaclass=ABCMeta):
         subclass implementation based on supported keys in
         ``KEY_FOR_TYPE_AND_SCHEME``.
 
+        Args:
+            keyid: Key identifier.
+            key_dict: Serialized key dict.
+            registry: Optional ``SignerRegistry`` to dispatch with, instead
+                of the global ``KEY_FOR_TYPE_AND_SCHEME`` table. The registry
+                is also used for nested dispatch calls made by the key
+                implementation.
+
         Raises:
             KeyError, TypeError: Invalid arguments.
         """
         keytype = key_dict.get("keytype")
         scheme = key_dict.get("scheme")
-        if (keytype, scheme) not in KEY_FOR_TYPE_AND_SCHEME:
-            raise ValueError(f"Unsupported public key {keytype}/{scheme}")
+
+        if registry is None:
+            registry = CURRENT_REGISTRY.get()
+
+        if registry is None:
+            dispatch_table = KEY_FOR_TYPE_AND_SCHEME
+        else:
+            dispatch_table = registry._key_for_type_and_scheme
 
         # NOTE: Explicitly not checking the keytype and scheme types to allow
         # intoto to use (None,None) to lookup GPGKey, see issue #450
-        key_impl = KEY_FOR_TYPE_AND_SCHEME[(keytype, scheme)]  # type: ignore
-        return key_impl.from_dict(keyid, key_dict)  # type: ignore
+        if (keytype, scheme) not in dispatch_table:
+            raise ValueError(f"Unsupported public key {keytype}/{scheme}")
+
+        key_impl = dispatch_table[(keytype, scheme)]  # type: ignore
+
+        if registry is None:
+            return key_impl.from_dict(keyid, key_dict)  # type: ignore
+
+        # Make the registry ambient so that nested dispatch calls made by
+        # the key implementation resolve against the same registry.
+        token = CURRENT_REGISTRY.set(registry)
+        try:
+            return key_impl.from_dict(keyid, key_dict)  # type: ignore
+        finally:
+            CURRENT_REGISTRY.reset(token)
 
     @abstractmethod
     def to_dict(self) -> dict[str, Any]:
@@ -311,7 +347,12 @@ class SSlibKey(Key):
         raise ValueError(f"method not supported for scheme {self.scheme}")
 
     @classmethod
-    def from_dict(cls, keyid: str, key_dict: dict[str, Any]) -> SSlibKey:
+    def from_dict(
+        cls,
+        keyid: str,
+        key_dict: dict[str, Any],
+        registry: SignerRegistry | None = None,
+    ) -> SSlibKey:
         keytype, scheme, keyval = cls._from_dict(key_dict)
 
         # All fields left in the key_dict are unrecognized.

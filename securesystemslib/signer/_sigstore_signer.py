@@ -12,6 +12,7 @@ from securesystemslib.exceptions import (
     UnverifiedSignatureError,
     VerificationError,
 )
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signer import (
     Key,
     SecretsHandler,
@@ -52,7 +53,12 @@ class SigstoreKey(Key):
         super().__init__(keyid, keytype, scheme, keyval, unrecognized_fields)
 
     @classmethod
-    def from_dict(cls, keyid: str, key_dict: dict[str, Any]) -> SigstoreKey:
+    def from_dict(
+        cls,
+        keyid: str,
+        key_dict: dict[str, Any],
+        registry: SignerRegistry | None = None,
+    ) -> SigstoreKey:
         keytype, scheme, keyval = cls._from_dict(key_dict)
         return cls(keyid, keytype, scheme, keyval, key_dict)
 
@@ -150,6 +156,7 @@ class SigstoreSigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> SigstoreSigner:
         try:
             from sigstore.models import ClientTrustConfig

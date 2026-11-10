@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+* `SignerRegistry`: per-instance dispatch registry for custom `Signer` and
+  `Key` implementations, as an isolated alternative to the global
+  `SIGNER_FOR_URI_SCHEME` and `KEY_FOR_TYPE_AND_SCHEME` tables. Registries
+  snapshot the built-in defaults, error on duplicate registrations unless
+  `replace=True`, and propagate through nested signer/key construction via
+  the new optional `registry` argument of `Signer.from_priv_key_uri()` and
+  `Key.from_dict()` (or the `registry.signer_from_priv_key_uri()` /
+  `registry.key_from_dict()` convenience methods)
+
 ## 1.6.0
 
 ### Changed

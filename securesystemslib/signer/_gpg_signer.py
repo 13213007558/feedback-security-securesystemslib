@@ -11,6 +11,7 @@ from securesystemslib._gpg import constants as gpg_constants
 from securesystemslib._gpg import exceptions as gpg_exceptions
 from securesystemslib._gpg import functions as gpg
 from securesystemslib.signer._key import Key
+from securesystemslib.signer._registry import SignerRegistry
 from securesystemslib.signer._signer import SecretsHandler, Signature, Signer
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,12 @@ class GPGKey(Key):
     """
 
     @classmethod
-    def from_dict(cls, keyid: str, key_dict: dict[str, Any]) -> GPGKey:
+    def from_dict(
+        cls,
+        keyid: str,
+        key_dict: dict[str, Any],
+        registry: SignerRegistry | None = None,
+    ) -> GPGKey:
         keytype, scheme, keyval = cls._from_dict(key_dict)
         return cls(keyid, keytype, scheme, keyval, key_dict)
 
@@ -101,6 +107,7 @@ class GPGSigner(Signer):
         priv_key_uri: str,
         public_key: Key,
         secrets_handler: SecretsHandler | None = None,
+        registry: SignerRegistry | None = None,
     ) -> GPGSigner:
         if not isinstance(public_key, GPGKey):
             raise ValueError(f"expected GPGKey for {priv_key_uri}")
