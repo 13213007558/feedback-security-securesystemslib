@@ -64,6 +64,12 @@ class Envelope:
 
             FormatError: If signature in "signatures" is incorrect.
 
+        Note:
+            "data" is only read, never modified: the Envelope and its
+            Signatures own copies of all data they keep, so later changes to
+            "data" do not affect the Envelope. This also holds if parsing
+            fails partway through the signatures.
+
         Returns:
             A "Envelope" instance.
         """
@@ -73,8 +79,12 @@ class Envelope:
 
         signatures = {}
         for signature in data["signatures"]:
-            signature["sig"] = b64dec(signature["sig"]).hex()
-            sig = Signature.from_dict(signature)
+            # Convert the signature on a throwaway copy: the input dict
+            # belongs to the caller, and Signature.from_dict takes ownership
+            # of its own copy of the data it keeps.
+            sig_dict = dict(signature)
+            sig_dict["sig"] = b64dec(sig_dict["sig"]).hex()
+            sig = Signature.from_dict(sig_dict)
             if sig.keyid in signatures:
                 raise ValueError(f"Multiple signatures found for keyid {sig.keyid}")
             signatures[sig.keyid] = sig

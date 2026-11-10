@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -80,13 +81,18 @@ class Signature:
             KeyError: If any of the "keyid" and "sig" fields are missing from
                 the signature_dict.
 
-        Side Effect:
-            Destroys the metadata dict passed by reference.
+        Note:
+            "signature_dict" is only read, never modified: the Signature
+            takes ownership of a deep copy of all data it keeps, so later
+            changes to "signature_dict" do not affect the Signature.
 
         Returns:
             A "Signature" instance.
         """
 
+        # Copy first: the caller keeps ownership of signature_dict, the
+        # Signature owns the copy (including unrecognized fields).
+        signature_dict = copy.deepcopy(signature_dict)
         keyid = signature_dict.pop("keyid")
         sig = signature_dict.pop("sig")
         # All fields left in the signature_dict are unrecognized.

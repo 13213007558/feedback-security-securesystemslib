@@ -1,5 +1,6 @@
 """Test cases for "metadata.py"."""
 
+import binascii
 import copy
 import unittest
 from pathlib import Path
@@ -69,6 +70,81 @@ class TestEnvelope(unittest.TestCase):
 
         # Assert envelope dict created by to_dict will be equal.
         self.assertDictEqual(self.envelope_dict, envelope_obj.to_dict())
+
+    def test_envelope_from_dict_does_not_modify_input(self):
+        """from_dict only reads its input: parsing twice gives equal results."""
+        envelope_dict = copy.deepcopy(self.envelope_dict)
+        snapshot = copy.deepcopy(envelope_dict)
+
+        envelope_obj = Envelope.from_dict(envelope_dict)
+        self.assertEqual(envelope_dict, snapshot)
+
+        # Parsing the same dict again gives an equal envelope.
+        envelope_obj_2 = Envelope.from_dict(envelope_dict)
+        self.assertEqual(envelope_dict, snapshot)
+        self.assertEqual(envelope_obj, envelope_obj_2)
+
+    def test_envelope_from_dict_failure_leaves_input_untouched(self):
+        """A failing parse must not leave a half-modified input dict."""
+        # Corrupt base64 in the second signature: the first signature dict
+        # must still be intact after the failure.
+        envelope_dict = copy.deepcopy(self.envelope_dict)
+        envelope_dict["signatures"].append(
+            {"keyid": "other-keyid", "sig": "!!!not-base64!!!"}
+        )
+        snapshot = copy.deepcopy(envelope_dict)
+        with self.assertRaises(binascii.Error):
+            Envelope.from_dict(envelope_dict)
+        self.assertEqual(envelope_dict, snapshot)
+
+        # Duplicate keyid: raises ValueError, input stays intact.
+        envelope_dict = copy.deepcopy(self.envelope_dict)
+        envelope_dict["signatures"].append(copy.deepcopy(self.signature_dict))
+        snapshot = copy.deepcopy(envelope_dict)
+        with self.assertRaises(ValueError):
+            Envelope.from_dict(envelope_dict)
+        self.assertEqual(envelope_dict, snapshot)
+
+    def test_envelope_from_dict_owns_signature_data(self):
+        """The parsed envelope owns its data: later input changes and shared
+        nested dicts in the input do not affect it."""
+        shared_extra = {"nested": {"foo": ["bar"]}}
+        envelope_dict = {
+            "payload": "aGVsbG8gd29ybGQ=",
+            "payloadType": "http://example.com/HelloWorld",
+            "signatures": [
+                {"keyid": "aa", "sig": "c2lnMQ==", "extra": shared_extra},
+                {"keyid": "bb", "sig": "c2lnMg==", "extra": shared_extra},
+            ],
+        }
+        envelope_obj = Envelope.from_dict(envelope_dict)
+
+        # Signatures are parsed to hex, unrecognized fields are kept.
+        self.assertEqual(envelope_obj.signatures["aa"].signature, "73696731")
+        self.assertEqual(
+            envelope_obj.signatures["aa"].unrecognized_fields,
+            {"extra": {"nested": {"foo": ["bar"]}}},
+        )
+
+        # Mutating the input afterwards must not change the parsed envelope.
+        envelope_dict["payload"] = "b3RoZXIgZGF0YQ=="
+        envelope_dict["signatures"][0]["sig"] = "AAAA"
+        shared_extra["nested"]["foo"].append("changed")
+        shared_extra["new"] = "field"
+
+        self.assertEqual(envelope_obj.payload, b"hello world")
+        self.assertEqual(envelope_obj.pae(), self.pae)
+        self.assertEqual(envelope_obj.signatures["aa"].signature, "73696731")
+        self.assertEqual(
+            envelope_obj.signatures["aa"].unrecognized_fields,
+            {"extra": {"nested": {"foo": ["bar"]}}},
+        )
+
+        # The two signatures got independent copies of the shared nested dict.
+        self.assertIsNot(
+            envelope_obj.signatures["aa"].unrecognized_fields["extra"],
+            envelope_obj.signatures["bb"].unrecognized_fields["extra"],
+        )
 
     def test_envelope_eq_(self):
         """Test envelope equality."""

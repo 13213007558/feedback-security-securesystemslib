@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import warnings
 from abc import ABCMeta, abstractmethod
@@ -187,6 +188,11 @@ class Key(metaclass=ABCMeta):
         subclass implementation based on supported keys in
         ``KEY_FOR_TYPE_AND_SCHEME``.
 
+        Note:
+            ``key_dict`` is only read, never modified: the key implementation
+            takes ownership of a deep copy of it, so the Key shares no data
+            with the caller's dict, even if deserialization fails partway.
+
         Raises:
             KeyError, TypeError: Invalid arguments.
         """
@@ -198,7 +204,9 @@ class Key(metaclass=ABCMeta):
         # NOTE: Explicitly not checking the keytype and scheme types to allow
         # intoto to use (None,None) to lookup GPGKey, see issue #450
         key_impl = KEY_FOR_TYPE_AND_SCHEME[(keytype, scheme)]  # type: ignore
-        return key_impl.from_dict(keyid, key_dict)  # type: ignore
+        # Dispatch on a deep copy: key_dict belongs to the caller, while key
+        # implementations may destroy the dict they receive (see _from_dict).
+        return key_impl.from_dict(keyid, copy.deepcopy(key_dict))  # type: ignore
 
     @abstractmethod
     def to_dict(self) -> dict[str, Any]:
@@ -227,6 +235,11 @@ class Key(metaclass=ABCMeta):
 
         Key implementations may call this in their from_dict, in order to parse
         out common fields. But they have to create the Key instance themselves.
+
+        Note:
+            This helper takes ownership of ``key_dict`` and destroys it.
+            ``Key.from_dict()`` already dispatches on a deep copy, so callers
+            that must preserve their dict should use ``Key.from_dict()``.
         """
         keytype = key_dict.pop("keytype")
         scheme = key_dict.pop("scheme")

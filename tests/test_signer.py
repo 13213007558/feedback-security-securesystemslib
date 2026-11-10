@@ -95,6 +95,40 @@ class TestKey(unittest.TestCase):
             with self.assertRaises((KeyError, ValueError)):
                 Key.from_dict("aa", keydict)
 
+    def test_key_from_dict_does_not_modify_input(self):
+        """Key.from_dict only reads its input and the key owns a copy."""
+        keydict = {
+            "keytype": "ed25519",
+            "scheme": "ed25519",
+            "extra": {"nested": ["data"]},
+            "keyval": {"public": "pubkeyval"},
+        }
+        snapshot = copy.deepcopy(keydict)
+
+        key = Key.from_dict("aa", keydict)
+        self.assertEqual(keydict, snapshot)
+
+        # Parsing the same dict again gives an equal key.
+        self.assertEqual(key, Key.from_dict("aa", keydict))
+
+        # Later changes to the input do not affect the parsed key.
+        keydict["keyval"]["public"] = "changed"
+        keydict["extra"]["nested"].append("changed")
+        self.assertEqual(key.keyval["public"], "pubkeyval")
+        self.assertEqual(key.unrecognized_fields["extra"], {"nested": ["data"]})
+
+    def test_key_from_dict_invalid_leaves_input_untouched(self):
+        """Invalid public key fields: no half-modified input dict."""
+        keydict = {
+            "keytype": "ed25519",
+            "scheme": "ed25519",
+            "keyval": {"x": "y"},
+        }
+        snapshot = copy.deepcopy(keydict)
+        with self.assertRaises(ValueError):
+            Key.from_dict("aa", keydict)
+        self.assertEqual(keydict, snapshot)
+
     def test_sha224_schemes_require_explicit_registration(self):
         """SHA-224 keys require callers to opt into the registry."""
         for scheme in SHA224_SCHEMES:
@@ -528,6 +562,27 @@ class TestSigner(unittest.TestCase):
         self.assertEqual(sig_obj.unrecognized_fields, {"foo": "bar"})
 
         self.assertDictEqual(signature_dict, sig_obj.to_dict())
+
+    def test_signature_from_dict_does_not_modify_input(self):
+        """Signature.from_dict only reads its input and owns a copy."""
+        signature_dict = {
+            "keyid": "aa",
+            "sig": "bb",
+            "extra": {"nested": ["data"]},
+        }
+        snapshot = copy.deepcopy(signature_dict)
+
+        sig_obj = Signature.from_dict(signature_dict)
+        self.assertEqual(signature_dict, snapshot)
+
+        # Parsing the same dict again gives an equal signature.
+        self.assertEqual(sig_obj, Signature.from_dict(signature_dict))
+
+        # Later changes to the input do not affect the parsed signature.
+        signature_dict["sig"] = "changed"
+        signature_dict["extra"]["nested"].append("changed")
+        self.assertEqual(sig_obj.signature, "bb")
+        self.assertEqual(sig_obj.unrecognized_fields["extra"], {"nested": ["data"]})
 
     def test_signature_eq_(self):
         signature_dict = {
